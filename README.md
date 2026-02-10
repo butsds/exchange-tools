@@ -16,6 +16,12 @@ A TypeScript library for synchronizing data between different sources and target
 npm install @butsds/exchange-tools
 ```
 
+Or install from GitHub Packages:
+
+```bash
+npm install @butsds/exchange-tools --registry=https://npm.pkg.github.com
+```
+
 ## Quick Start
 
 ```typescript
@@ -166,6 +172,16 @@ npm run build
 # Type checking
 npx tsc --noEmit
 ```
+
+## Publishing
+
+To publish a new version:
+
+1. Create a git tag with version: `git tag v1.0.0`
+2. Push the tag: `git push origin v1.0.0`
+3. GitHub Actions will automatically build and publish to GitHub Packages
+
+The package version will be automatically set from the tag name.
 
 ## License
 
