@@ -2,6 +2,9 @@
   "name": "@butsds/exchange-tools",
   "version": "0.0.0",
   "license": "MIT",
+  "files": [
+    "dist"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/butsds/exchange-tools.git"
