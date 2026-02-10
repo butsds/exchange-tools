@@ -1,8 +1,11 @@
 {
   "name": "@butsds/exchange-tools",
-  "private": true,
   "version": "0.0.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/butsds/exchange-tools.git"
+  },
   "type": "module",
   "main": "./dist/exchange-tools.umd.cjs",
   "module": "./dist/exchange-tools.js",
