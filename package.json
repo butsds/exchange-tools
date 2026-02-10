@@ -3,6 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/butsds/exchange-tools.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/exchange-tools.umd.cjs",
   "module": "./dist/exchange-tools.js",
