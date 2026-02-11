@@ -3,12 +3,14 @@ import type {
   AdapterType,
   EventSubscriberType,
   ExchangePolicyType,
+  ConverterType,
 } from "../types"
 import { EventEmitter } from "eventemitter3"
 
 export abstract class Exchange<T extends object> implements ExchangeType {
   protected sourceAdapter: AdapterType<T>
   protected targetAdapter: AdapterType<T>
+  protected converter: ConverterType<T>
 
   protected sourceData = new Map<string, T>()
   protected targetData = new Map<string, T>()
@@ -24,6 +26,7 @@ export abstract class Exchange<T extends object> implements ExchangeType {
   constructor(sourceAdapter: AdapterType<T>, targetAdapter: AdapterType<T>) {
     this.sourceAdapter = sourceAdapter
     this.targetAdapter = targetAdapter
+    this.converter = (data) => data
     this.emitter = new EventEmitter()
   }
 
@@ -33,6 +36,11 @@ export abstract class Exchange<T extends object> implements ExchangeType {
 
   setPolicy(policy: Partial<ExchangePolicyType>): this {
     this.policy = { ...this.policy, ...policy }
+    return this
+  }
+
+  setConverter(converter: ConverterType<T>): this {
+    this.converter = converter
     return this
   }
 
@@ -51,17 +59,21 @@ export abstract class Exchange<T extends object> implements ExchangeType {
 
     await Promise.all([sourcePromise, targetPromise])
 
-    this.sourceData.forEach((sourceItem, key) => {
-      const targetItem = this.targetData.get(key)
+    this.sourceData.forEach(async (sourceItem, key) => {
+      let targetItem = this.targetData.get(key)
 
+      sourceItem = this.converter(sourceItem)
+      
       if (!targetItem) {
         if (this.policy.create === "do") {
-          this.targetAdapter.create(sourceItem)
+          await this.targetAdapter.create(sourceItem)
           this.emitter.emit("itemCreated", sourceItem)
         } else if (this.policy.create === "info") {
           console.info(`Item with key "${key}" will be created.`)
         }
         return
+      } else {
+        targetItem = this.converter(targetItem)
       }
 
       if (this.compare(sourceItem, targetItem)) {
@@ -72,7 +84,7 @@ export abstract class Exchange<T extends object> implements ExchangeType {
 
       if (updateData) {
         if (this.policy.update === "do") {
-          this.targetAdapter.update(updateData)
+          await this.targetAdapter.update(updateData)
           this.emitter.emit("itemUpdated", updateData)
         } else if (this.policy.update === "info") {
           console.info(
@@ -87,10 +99,10 @@ export abstract class Exchange<T extends object> implements ExchangeType {
       }
     })
 
-    this.targetData.forEach((targetItem, key) => {
+    this.targetData.forEach(async (targetItem, key) => {
       if (!this.sourceData.has(key)) {
         if (this.policy.delete === "do") {
-          this.targetAdapter.delete(targetItem)
+          await this.targetAdapter.delete(targetItem)
           this.emitter.emit("itemDeleted", targetItem)
         } else if (this.policy.delete === "info") {
           console.info(`Item with key "${key}" will be deleted.`)

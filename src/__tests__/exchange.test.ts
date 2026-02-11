@@ -57,7 +57,7 @@ describe("Exchange", () => {
     await targetAdapter.create({ id: "3", name: "Item 3" })
 
     const exchange = new TestExchange(sourceAdapter, targetAdapter)
-    exchange.setPolicy({ create: "do", delete: "do" })
+    exchange.setPolicy({ create: "do", delete: "do" }).setConverter((data) => data)
 
     await exchange.run()
 
@@ -87,7 +87,7 @@ describe("Exchange", () => {
     await targetAdapter.create({ id: "3", name: "Item 3" })
 
     const exchange = new TestExchange(sourceAdapter, targetAdapter)
-    exchange.setPolicy({ create: "do", delete: "do" })
+    exchange.setPolicy({ create: "do", delete: "do" }).setConverter((data) => data)
 
     const runBeforeSpy = vi.fn()
     const runAfterSpy = vi.fn()
@@ -130,7 +130,7 @@ describe("Exchange", () => {
     await sourceAdapter.create({ id: "1", name: "Item 1" })
     await sourceAdapter.create({ id: "1", name: "Item 1 Duplicate" }) // Same id
 
-    const exchange = new TestExchange(sourceAdapter, targetAdapter)
+    const exchange = new TestExchange(sourceAdapter, targetAdapter).setConverter((data) => data)
 
     await expect(exchange.run()).rejects.toThrow(
       'Duplicate key "1" found in data.',
@@ -147,7 +147,7 @@ describe("Exchange", () => {
     await targetAdapter.create({ id: "1", name: "Item 1" })
     await targetAdapter.create({ id: "1", name: "Item 1 Duplicate" }) // Same id
 
-    const exchange = new TestExchange(sourceAdapter, targetAdapter)
+    const exchange = new TestExchange(sourceAdapter, targetAdapter).setConverter((data) => data)
 
     await expect(exchange.run()).rejects.toThrow(
       'Duplicate key "1" found in data.',

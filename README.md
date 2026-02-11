@@ -8,6 +8,7 @@ A TypeScript library for synchronizing data between different sources and target
 - **Event-Driven**: Subscribe to synchronization events
 - **Type-Safe**: Full TypeScript support with generic types
 - **Policy-Based**: Configurable policies for create/update/delete operations
+- **Data Conversion**: Optional data transformation before comparison
 - **Duplicate Detection**: Automatic detection of duplicate keys
 
 ## Installation
@@ -41,6 +42,12 @@ class DatabaseAdapter implements AdapterType<User> {
 
 // Create exchange instance
 const exchange = new Exchange<User>(sourceAdapter, targetAdapter)
+
+// Set converter (optional) - transforms data before comparison
+exchange.setConverter((user) => ({
+  ...user,
+  name: user.name.toLowerCase(), // Example transformation
+}))
 
 // Set policies (optional)
 exchange.setPolicy({
@@ -80,6 +87,7 @@ new Exchange<T>(sourceAdapter: AdapterType<T>, targetAdapter: AdapterType<T>)
 #### Methods
 
 - `setPolicy(policy: Partial<ExchangePolicyType>): this` - Set operation policies
+- `setConverter(converter: ConverterType<T>): this` - Set data converter function
 - `subscribe(subscriber: Partial<EventSubscriberType<T>>): () => void` - Subscribe to events
 - `run(): Promise<void>` - Execute synchronization
 
@@ -106,27 +114,22 @@ interface ExchangePolicyType {
 }
 ```
 
-### EventSubscriberType<T>
+### ConverterType<T>
+
+Function type for data conversion.
 
 ```typescript
-interface EventSubscriberType<T> {
-  runBefore: () => void
-  runAfter: () => void
-  sourceDataReady: () => void
-  targetDataReady: () => void
-  itemCreated: (item: T) => void
-  itemUpdated: (item: Partial<T>) => void
-  itemDeleted: (item: T) => void
-}
+type ConverterType<T> = (data: T) => T
 ```
 
 ## Synchronization Logic
 
 1. Read data from source and target adapters
-2. Compare items by common key (defined by `getCommonKey` method)
-3. For items in source but not in target: create
-4. For items in both: update if different
-5. For items in target but not in source: delete
+2. Apply converter to all items (if set)
+3. Compare items by common key (defined by `getCommonKey` method)
+4. For items in source but not in target: create
+5. For items in both: update if different
+6. For items in target but not in source: delete
 
 ## Extending Exchange
 

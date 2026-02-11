@@ -26,3 +26,5 @@ export interface ExchangePolicyType {
   update?: ActionType
   delete?: ActionType
 }
+
+export type ConverterType<T extends object> = (data: T) => T

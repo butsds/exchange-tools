@@ -4,4 +4,5 @@ export type {
   AdapterType,
   ExchangePolicyType,
   EventSubscriberType,
+  ConverterType,
 } from "./types"
