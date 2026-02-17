@@ -8,7 +8,6 @@ A TypeScript library for synchronizing data between different sources and target
 - **Event-Driven**: Subscribe to synchronization events
 - **Type-Safe**: Full TypeScript support with generic types
 - **Policy-Based**: Configurable policies for create/update/delete operations
-- **Data Conversion**: Optional data transformation before comparison
 - **Duplicate Detection**: Automatic detection of duplicate keys
 
 ## Installation
@@ -41,13 +40,7 @@ class DatabaseAdapter implements AdapterType<User> {
 }
 
 // Create exchange instance
-const exchange = new Exchange<User>(sourceAdapter, targetAdapter)
-
-// Set converter (optional) - transforms data before comparison
-exchange.setConverter((user) => ({
-  ...user,
-  name: user.name.toLowerCase(), // Example transformation
-}))
+const exchange = new Exchange<User, User>(sourceAdapter, targetAdapter)
 
 // Set policies (optional)
 exchange.setPolicy({
@@ -74,21 +67,20 @@ unsubscribe()
 
 ## API Reference
 
-### Exchange<T>
+### Exchange<S, T>
 
 Main synchronization class.
 
 #### Constructor
 
 ```typescript
-new Exchange<T>(sourceAdapter: AdapterType<T>, targetAdapter: AdapterType<T>)
+new Exchange<S, T>(sourceAdapter: AdapterType<S>, targetAdapter: AdapterType<T>)
 ```
 
 #### Methods
 
 - `setPolicy(policy: Partial<ExchangePolicyType>): this` - Set operation policies
-- `setConverter(converter: ConverterType<T>): this` - Set data converter function
-- `subscribe(subscriber: Partial<EventSubscriberType<T>>): () => void` - Subscribe to events
+- `subscribe(subscriber: Partial<EventSubscriberType<S, T>>): () => void` - Subscribe to events
 - `run(): Promise<void>` - Execute synchronization
 
 ### AdapterType<T>
@@ -98,7 +90,7 @@ Interface for data adapters.
 ```typescript
 interface AdapterType<T> {
   read(): Promise<T[]>
-  create(data: T): Promise<void>
+  create(data: T): Promise<string | number | bigint>
   update(data: Partial<T>): Promise<void>
   delete(data: Partial<T>): Promise<void>
 }
@@ -125,28 +117,39 @@ type ConverterType<T> = (data: T) => T
 ## Synchronization Logic
 
 1. Read data from source and target adapters
-2. Apply converter to all items (if set)
-3. Compare items by common key (defined by `getCommonKey` method)
-4. For items in source but not in target: create
-5. For items in both: update if different
-6. For items in target but not in source: delete
+2. Compare items by keys (defined by `getSourceKey` and `getTargetKey` methods)
+3. For items in source but not in target: create
+4. For items in both: update if different
+5. For items in target but not in source: delete
 
 ## Extending Exchange
 
-Create a concrete class extending `Exchange<T>`:
+Create a concrete class extending `Exchange<S, T>`:
 
 ```typescript
-class MyExchange extends Exchange<MyData> {
-  getCommonKey(data: MyData): string {
+class MyExchange extends Exchange<SourceData, TargetData> {
+  getSourceKey(data: SourceData): string {
     return data.id
   }
 
-  compare(source: MyData, target: MyData): boolean {
-    return source.version === target.version
+  getTargetKey(data: TargetData): string {
+    return data.id
   }
 
-  getUpdateData(source: MyData, target: MyData): Partial<MyData> | false {
-    // Return update data or false to skip
+  getUpdateData(source: SourceData, target: TargetData): Partial<TargetData> | false {
+    // Return update data or false to skip update
+    if (source.version === target.version) {
+      return false // No update needed
+    }
+    return { version: source.version } // Update only version
+  }
+
+  convertSourceToTarget(source: SourceData): TargetData {
+    return {
+      id: source.id,
+      name: source.name,
+      // Convert other fields as needed
+    }
   }
 }
 ```
@@ -185,6 +188,16 @@ To publish a new version:
 3. GitHub Actions will automatically build and publish to GitHub Packages
 
 The package version will be automatically set from the tag name.
+
+## Changelog
+
+### [Unreleased]
+
+- **Breaking Change**: `Exchange` class now supports different source and target types: `Exchange<S, T>`. Requires implementing `getSourceKey`, `getTargetKey`, `convertSourceToTarget` methods.
+- **Breaking Change**: `EventSubscriberType` now takes two type parameters: `EventSubscriberType<S, T>`.
+- **Breaking Change**: Removed the `converter` functionality from `Exchange` class. The `setConverter` method and data transformation before comparison are no longer supported.
+- **Breaking Change**: Removed the `compare` method from `Exchange` class. Update logic now relies solely on `getUpdateData` method returning `false` to skip updates.
+- **Breaking Change**: `AdapterType.create` method now returns `Promise<string | number | bigint>` instead of `Promise<void>`. This allows adapters to return identifiers or status codes after creation.
 
 ## License
 

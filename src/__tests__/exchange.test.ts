@@ -6,16 +6,23 @@ interface TestData {
   name: string
 }
 
-class TestExchange extends Exchange<TestData> {
-  getCommonKey(data: TestData): string {
+class TestExchange extends Exchange<TestData, TestData> {
+  getSourceKey(data: TestData): string {
     return data.id
   }
 
-  compare(source: TestData, target: TestData): boolean {
-    return source.name === target.name
+  getTargetKey(data: TestData): string {
+    return data.id
   }
 
-  getUpdateData(source: TestData): Partial<TestData> | false {
+  getUpdateData(source: TestData, target: TestData): Partial<TestData> | false {
+    if (source.name === target.name) {
+      return false
+    }
+    return source
+  }
+
+  convertSourceToTarget(source: TestData): TestData {
     return source
   }
 }
@@ -23,8 +30,9 @@ class TestExchange extends Exchange<TestData> {
 class MockAdapter {
   private data: TestData[] = []
 
-  async create(data: TestData): Promise<void> {
+  async create(data: TestData): Promise<string> {
     this.data.push(data)
+    return "created"
   }
 
   async read(): Promise<TestData[]> {
@@ -57,7 +65,7 @@ describe("Exchange", () => {
     await targetAdapter.create({ id: "3", name: "Item 3" })
 
     const exchange = new TestExchange(sourceAdapter, targetAdapter)
-    exchange.setPolicy({ create: "do", delete: "do" }).setConverter((data) => data)
+    exchange.setPolicy({ create: "do", delete: "do" })
 
     await exchange.run()
 
@@ -87,7 +95,7 @@ describe("Exchange", () => {
     await targetAdapter.create({ id: "3", name: "Item 3" })
 
     const exchange = new TestExchange(sourceAdapter, targetAdapter)
-    exchange.setPolicy({ create: "do", delete: "do" }).setConverter((data) => data)
+    exchange.setPolicy({ create: "do", delete: "do" })
 
     const runBeforeSpy = vi.fn()
     const runAfterSpy = vi.fn()
@@ -130,7 +138,7 @@ describe("Exchange", () => {
     await sourceAdapter.create({ id: "1", name: "Item 1" })
     await sourceAdapter.create({ id: "1", name: "Item 1 Duplicate" }) // Same id
 
-    const exchange = new TestExchange(sourceAdapter, targetAdapter).setConverter((data) => data)
+    const exchange = new TestExchange(sourceAdapter, targetAdapter)
 
     await expect(exchange.run()).rejects.toThrow(
       'Duplicate key "1" found in data.',
@@ -147,7 +155,7 @@ describe("Exchange", () => {
     await targetAdapter.create({ id: "1", name: "Item 1" })
     await targetAdapter.create({ id: "1", name: "Item 1 Duplicate" }) // Same id
 
-    const exchange = new TestExchange(sourceAdapter, targetAdapter).setConverter((data) => data)
+    const exchange = new TestExchange(sourceAdapter, targetAdapter)
 
     await expect(exchange.run()).rejects.toThrow(
       'Duplicate key "1" found in data.',

@@ -3,16 +3,14 @@ import type {
   AdapterType,
   EventSubscriberType,
   ExchangePolicyType,
-  ConverterType,
 } from "../types"
 import { EventEmitter } from "eventemitter3"
 
-export abstract class Exchange<T extends object> implements ExchangeType {
-  protected sourceAdapter: AdapterType<T>
+export abstract class Exchange<S extends object, T extends object> implements ExchangeType {
+  protected sourceAdapter: AdapterType<S>
   protected targetAdapter: AdapterType<T>
-  protected converter: ConverterType<T>
 
-  protected sourceData = new Map<string, T>()
+  protected sourceData = new Map<string, S>()
   protected targetData = new Map<string, T>()
 
   protected policy: ExchangePolicyType = {
@@ -23,24 +21,19 @@ export abstract class Exchange<T extends object> implements ExchangeType {
 
   protected emitter: EventEmitter
 
-  constructor(sourceAdapter: AdapterType<T>, targetAdapter: AdapterType<T>) {
+  constructor(sourceAdapter: AdapterType<S>, targetAdapter: AdapterType<T>) {
     this.sourceAdapter = sourceAdapter
     this.targetAdapter = targetAdapter
-    this.converter = (data) => data
     this.emitter = new EventEmitter()
   }
 
-  abstract getCommonKey(data: T): string
-  abstract compare(source: T, target: T): boolean
-  abstract getUpdateData(source: T, target: T): Partial<T> | false
+  abstract getSourceKey(data: S): string
+  abstract getTargetKey(data: T): string
+  abstract getUpdateData(source: S, target: T): Partial<T> | false
+  abstract convertSourceToTarget(source: S): T
 
   setPolicy(policy: Partial<ExchangePolicyType>): this {
     this.policy = { ...this.policy, ...policy }
-    return this
-  }
-
-  setConverter(converter: ConverterType<T>): this {
-    this.converter = converter
     return this
   }
 
@@ -48,12 +41,12 @@ export abstract class Exchange<T extends object> implements ExchangeType {
     this.emitter.emit("runBefore")
 
     const sourcePromise = this.sourceAdapter.read().then((data) => {
-      this.putTo(this.sourceData, data)
+      this.putTo(this.sourceData, data, this.getSourceKey.bind(this))
       this.emitter.emit("sourceDataReady")
     })
 
     const targetPromise = this.targetAdapter.read().then((data) => {
-      this.putTo(this.targetData, data)
+      this.putTo(this.targetData, data, this.getTargetKey.bind(this))
       this.emitter.emit("targetDataReady")
     })
 
@@ -62,21 +55,13 @@ export abstract class Exchange<T extends object> implements ExchangeType {
     this.sourceData.forEach(async (sourceItem, key) => {
       let targetItem = this.targetData.get(key)
 
-      sourceItem = this.converter(sourceItem)
-      
       if (!targetItem) {
         if (this.policy.create === "do") {
-          await this.targetAdapter.create(sourceItem)
+          await this.targetAdapter.create(this.convertSourceToTarget(sourceItem))
           this.emitter.emit("itemCreated", sourceItem)
         } else if (this.policy.create === "info") {
           console.info(`Item with key "${key}" will be created.`)
         }
-        return
-      } else {
-        targetItem = this.converter(targetItem)
-      }
-
-      if (this.compare(sourceItem, targetItem)) {
         return
       }
 
@@ -113,31 +98,31 @@ export abstract class Exchange<T extends object> implements ExchangeType {
     this.emitter.emit("runAfter")
   }
 
-  subscribe(subscriber: Partial<EventSubscriberType<T>>): () => void {
+  subscribe(subscriber: Partial<EventSubscriberType<S, T>>): () => void {
     for (const event in subscriber) {
-      if (subscriber[event as keyof EventSubscriberType<T>]) {
+      if (subscriber[event as keyof EventSubscriberType<S, T>]) {
         this.emitter.on(
           event,
-          subscriber[event as keyof EventSubscriberType<T>] as any,
+          subscriber[event as keyof EventSubscriberType<S, T>] as any,
         )
       }
     }
 
     return () => {
       for (const event in subscriber) {
-        if (subscriber[event as keyof EventSubscriberType<T>]) {
+        if (subscriber[event as keyof EventSubscriberType<S, T>]) {
           this.emitter.off(
             event,
-            subscriber[event as keyof EventSubscriberType<T>] as any,
+            subscriber[event as keyof EventSubscriberType<S, T>] as any,
           )
         }
       }
     }
   }
 
-  protected putTo(target: Map<string, T>, data: T[]): void {
+  protected putTo<U extends object>(target: Map<string, U>, data: U[], getKey: (data: U) => string): void {
     data.forEach((item) => {
-      const key = this.getCommonKey(item)
+      const key = getKey(item)
 
       if (target.has(key)) {
         throw new Error(`Duplicate key "${key}" found in data.`)
